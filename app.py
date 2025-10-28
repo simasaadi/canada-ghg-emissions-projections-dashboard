@@ -151,7 +151,9 @@ fig4.update_layout(xaxis_tickangle=-35, margin=dict(l=20, r=20, t=60, b=80))
 st.plotly_chart(fig4, use_container_width=True)
 
 # --- National trend (Detailed vs Scenario Summary) from Tab3 ---
+# --- National Trend (Detailed vs Scenario Summary) ---
 st.markdown("### National Trend (Detailed vs Scenario Summary)")
+
 tab3_path = Path("data/Tab3_a1_megatonnes_ref_GHG_Scenarios_GES_EN.xlsx")
 if not tab3_path.exists():
     st.warning("Tab3 file not found at data/Tab3_a1_megatonnes_ref_GHG_Scenarios_GES_EN.xlsx")
@@ -159,68 +161,120 @@ else:
     try:
         xls = pd.ExcelFile(tab3_path)
         t3 = pd.concat([pd.read_excel(tab3_path, sheet_name=sh) for sh in xls.sheet_names], ignore_index=True)
-
         t3.columns = [str(c).strip() for c in t3.columns]
-        low2orig = {c.lower(): c for c in t3.columns}
 
-        def pick_col(keywords):
-            for lower_name, orig in low2orig.items():
-                if all(k in lower_name for k in keywords):
-                    return orig
-            return None
+        # ---------- helper: smart column guessing with many aliases ----------
+        def guess(cols, aliases):
+            cols_low = [c.lower() for c in cols]
+            best = None
+            best_len = -1
+            for i, low in enumerate(cols_low):
+                if all(any(a in low for a in alias_group) for alias_group in aliases):
+                    # prefer longer matches (more descriptive)
+                    if len(low) > best_len:
+                        best = cols[i]
+                        best_len = len(low)
+            return best
 
-        year_col   = pick_col(["year"])
-        value_col  = pick_col(["emission"]) or pick_col(["megaton"]) or pick_col(["mt"])
-        scen_col   = pick_col(["scenario"]) or pick_col(["case"])
-        sector_col = pick_col(["sector"]) or pick_col(["category"]) or pick_col(["total"])
-        detail_col = pick_col(["detailed"]) or pick_col(["summary"]) or pick_col(["detail"]) or pick_col(["source"])
+        # Aliases (try bilingual & variants)
+        year_guess = guess(
+            t3.columns,
+            [["year", "année", "annee"]]
+        )
+        value_guess = guess(
+            t3.columns,
+            [["emission", "megatonne", "megatonnes", "megaton", "mt", "co2", "co2e"]]
+        )
+        scen_guess = guess(
+            t3.columns,
+            [["scenario", "case", "scénario", "scenar"]]
+        )
+        sector_guess = guess(
+            t3.columns,
+            [["sector", "secteur", "category", "catégorie", "total"]]
+        )
+        detail_guess = guess(
+            t3.columns,
+            [["detailed", "detail", "summary", "sommaire", "source", "type"]]
+        )
 
-        if year_col is None or value_col is None:
-            st.warning("Could not detect Year or Emissions column in Tab3.")
+        with st.expander("Tab3 preview / column picker (use if auto-detect looks wrong)"):
+            st.write("**Detected columns (editable if wrong):**")
+            c1, c2, c3 = st.columns(3)
+            year_col   = c1.selectbox("Year column", options=t3.columns.tolist(), index=(t3.columns.tolist().index(year_guess) if year_guess in t3.columns else 0))
+            value_col  = c2.selectbox("Emissions column", options=t3.columns.tolist(), index=(t3.columns.tolist().index(value_guess) if value_guess in t3.columns else 0))
+            scen_col   = c3.selectbox("Scenario column (optional)", options=[None]+t3.columns.tolist(), index=(t3.columns.tolist().index(scen_guess)+1 if scen_guess in t3.columns else 0))
+            c4, c5 = st.columns(2)
+            sector_col = c4.selectbox("Sector/Category column (optional)", options=[None]+t3.columns.tolist(), index=(t3.columns.tolist().index(sector_guess)+1 if sector_guess in t3.columns else 0))
+            detail_col = c5.selectbox("Detail/Type column (optional)", options=[None]+t3.columns.tolist(), index=(t3.columns.tolist().index(detail_guess)+1 if detail_guess in t3.columns else 0))
+            st.caption("If you change picks above, the chart below will update.")
+            st.write("**First 10 rows**")
+            st.dataframe(t3.head(10))
+
+        # Basic validation
+        if not year_col or not value_col:
+            st.warning("Please choose the Year and Emissions columns above.")
         else:
             g = t3.copy()
+
+            # normalize text columns if present
             for c in [scen_col, sector_col, detail_col]:
                 if c and c in g.columns:
                     g[c] = g[c].astype(str).str.strip()
 
+            # numeric
             g[year_col] = pd.to_numeric(g[year_col], errors="coerce")
             g[value_col] = pd.to_numeric(g[value_col], errors="coerce")
 
-            if detail_col is None:
-                def infer_detail(s):
-                    s = str(s).lower()
-                    if "detailed" in s:
-                        return "Detailed"
-                    if "summary" in s:
-                        return "Scenario summary"
-                    return "Unknown"
-                g["DetailType"] = g[scen_col].apply(infer_detail) if scen_col else "Unknown"
-                detail_col = "DetailType"
+            # infer Detail vs Summary if missing
+            if not detail_col:
+                if scen_col:
+                    def infer_detail(s):
+                        s = str(s).lower()
+                        if "detailed" in s:
+                            return "Detailed"
+                        if "summary" in s or "scenario summary" in s:
+                            return "Scenario summary"
+                        return "Unknown"
+                    g["DetailType"] = g[scen_col].apply(infer_detail)
+                    detail_col = "DetailType"
+                else:
+                    g["DetailType"] = "Unknown"
+                    detail_col = "DetailType"
 
-            if scen_col is None:
+            # fill Scenario if missing
+            if not scen_col:
                 g["ScenarioName"] = "Scenario"
                 scen_col = "ScenarioName"
 
+            # prefer national totals when a sector column exists
             if sector_col and sector_col in g.columns:
-                mask_total = g[sector_col].str.lower().isin(["total", "totals", "all sectors", "all"])
+                mask_total = g[sector_col].str.lower().isin(["total", "totals", "all sectors", "all", "total/all"])
                 if mask_total.any():
                     g = g[mask_total]
 
+            # clean scenario buckets
             def clean_scn(s):
                 s = str(s)
-                if ("Additional" in s) and ("Reference" not in s):
+                if ("Additional" in s or "Mesures additionnelles" in s) and ("Reference" not in s and "Référence" not in s):
                     return "Additional Measures Case"
-                if "Reference" in s:
+                if ("Reference" in s) or ("Référence" in s):
                     return "Reference Case"
                 return s
-
             g["Scenario_clean"] = g[scen_col].apply(clean_scn)
+
+            # drop NaNs
             g = g.dropna(subset=[year_col, value_col])
 
-            gg = g.groupby([year_col, "Scenario_clean", detail_col], as_index=False)[value_col].sum()
+            # aggregate if multiple rows per year/scenario/detail
+            gg = (
+                g.groupby([year_col, "Scenario_clean", detail_col], as_index=False)[value_col]
+                 .sum()
+                 .sort_values([year_col, "Scenario_clean", detail_col])
+            )
 
             fig_nat = px.line(
-                gg.sort_values([year_col, "Scenario_clean", detail_col]),
+                gg,
                 x=year_col, y=value_col,
                 color="Scenario_clean",
                 line_dash=detail_col,
@@ -236,3 +290,4 @@ else:
 
     except Exception as e:
         st.error(f"Could not render the national trend from Tab3: {e}")
+
