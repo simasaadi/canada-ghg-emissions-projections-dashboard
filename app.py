@@ -98,23 +98,32 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 # -------- Tab 1: Stacked area like the PNG (Additional Measures) --------
+# -------- Tab 1: Stacked area like the PNG (Additional Measures) --------
 with tab1:
     st.caption("Sectoral Emissions — Additional Measures (mirrors the PNG style)")
-    # Always national totals, Additional Measures only
-    df_add = df[df["Scenario"].str.contains("Additional", case=False, regex=True)]
-    area = national_sum(df_add)  # << ignore province
+
+    df_add = df[df["Scenario"].str.contains("Additional", case=False, regex=True)].copy()
+    if prov != "All provinces":
+        df_add = df_add[df_add["Province"] == prov]
+    df_add = tidy_sectors(df_add)
+
+    # Aggregate across provinces (national total) for comparability with the PNG
+    area = df_add.groupby(["Year", "Economic Sector"], as_index=False)["Emissions"].sum()
+
     if area.empty:
         st.info("No data for this filter.")
     else:
-      fig2 = px.area(
-    area.sort_values(["Year","Economic Sector"]),
-    x="Year", y="Emissions", color="Economic Sector",
-    category_orders={"Economic Sector": SECTOR_ORDER},
-    color_discrete_map=SECTOR_COLORS,   # <-- this line
-    title="Sectoral Emissions — Additional Measures"
-)
-
-        fig2.update_layout(legend_title_text="", margin=dict(l=20,r=20,t=60,b=20))
+        fig2 = px.area(
+            area.sort_values(["Year", "Economic Sector"]),
+            x="Year",
+            y="Emissions",
+            color="Economic Sector",
+            category_orders={"Economic Sector": SECTOR_ORDER},
+            # comment this line out if you didn't define SECTOR_COLORS
+            color_discrete_map=SECTOR_COLORS,
+            title="Sectoral Emissions — Additional Measures",
+        )
+        fig2.update_layout(legend_title_text="", margin=dict(l=20, r=20, t=60, b=20))
         st.plotly_chart(fig2, use_container_width=True)
 
 
