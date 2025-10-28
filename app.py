@@ -156,9 +156,117 @@ fig4 = px.bar(prov_bar, x="Province", y="Emissions", title=f"Emissions by Provin
 fig4.update_layout(xaxis_tickangle=-35, margin=dict(l=20,r=20,t=60,b=80))
 st.plotly_chart(fig4, use_container_width=True)
 
+-
+# --- National Trend (Detailed vs Scenario Summary) ---
+st.markdown("### National Trend (Detailed vs Scenario Summary)")
 
-# --- National Trend Placeholder ---
-st.markdown("### National Trend (Detailed vs Scenario Summary)*")
-st.caption("(*Requires the Tab3 national summary file to compare Detailed vs Scenario Summary*)")
-st.info("You already uploaded the Tab3 file — I can wire this plot next. For now the three visuals above mirror the PNGs.")
+tab3_path = Path("data/Tab3_a1_megatonnes_ref_GHG_Scenarios_GES_EN.xlsx")
+if not tab3_path.exists():
+    st.warning("Tab3 file not found at data/Tab3_a1_megatonnes_ref_GHG_Scenarios_GES_EN.xlsx")
+else:
+    try:
+        # read all sheets just in case; concat
+        xls = pd.ExcelFile(tab3_path)
+        t3_frames = []
+        for sh in xls.sheet_names:
+            t3_frames.append(pd.read_excel(tab3_path, sheet_name=sh))
+        t3 = pd.concat(t3_frames, ignore_index=True)
 
+        # normalize columns
+        t3.columns = [str(c).strip() for c in t3.columns]
+        lowcols = {c.lower(): c for c in t3.columns}  # map lower->original
+
+        def pick_col(candidates):
+            """Return first existing column that contains ALL keywords in any order (case-insensitive)."""
+            for col_lower, orig in lowcols.items():
+                if all(k in col_lower for k in candidates):
+                    return orig
+            return None
+
+        # try to discover the key columns
+        year_col     = pick_col(["year"])
+        value_col    = (pick_col(["emission"]) or pick_col(["megaton"])
+                        or pick_col(["mt"]))  # flexible for 'Emissions', 'Megatonnes', etc.
+        scen_col     = (pick_col(["scenario"]) or pick_col(["case"]))
+        sector_col   = (pick_col(["sector"]) or pick_col(["category"]) or pick_col(["total"]))
+        detail_col   = (pick_col(["detailed"]) or pick_col(["summary"]) or pick_col(["detail"]) or pick_col(["source"]))
+
+        # hard fail if the two truly essential columns are missing
+        if year_col is None or value_col is None:
+            st.warning("Couldn’t detect Year/Emissions columns in Tab3. Please check headers.")
+        else:
+            # prepare a working copy
+            g = t3.copy()
+
+            # ensure strings + trim
+            for c in [scen_col, sector_col, detail_col]:
+                if c and c in g.columns:
+                    g[c] = g[c].astype(str).str.strip()
+
+            # coerce numerics
+            g[year_col] = pd.to_numeric(g[year_col], errors="coerce")
+            g[value_col] = pd.to_numeric(g[value_col], errors="coerce")
+
+            # infer 'detail vs summary' if not a separate column
+            if detail_col is None:
+                # look inside scenario text for hints
+                def infer_detail(s):
+                    s = str(s).lower()
+                    if "detailed" in s:
+                        return "Detailed"
+                    if "summary" in s or "scenario summary" in s:
+                        return "Scenario summary"
+                    return "Unknown"
+                g["DetailType"] = g[scen_col].apply(infer_detail) if scen_col else "Unknown"
+                detail_col = "DetailType"
+
+            # infer scenario names if not clear
+            if scen_col is None:
+                # fall back to a single scenario
+                g["ScenarioName"] = "Scenario"
+                scen_col = "ScenarioName"
+
+            # prefer a national total line: keep rows where sector/category equals 'Total' (if such column exists)
+            if sector_col and sector_col in g.columns:
+                # try common tokens for total rows
+                mask_total = g[sector_col].str.lower().isin(["total", "totals", "all sectors", "all"])
+                if mask_total.any():
+                    g = g[mask_total]
+
+            # standardize scenario buckets for colors
+            def clean_scn(s):
+                s = str(s)
+                # keep recognizable labels if present
+                if "Additional" in s and "Reference" not in s:
+                    return "Additional Measures Case"
+                if "Reference" in s:
+                    return "Reference Case"
+                return s
+            g["Scenario_clean"] = g[scen_col].apply(clean_scn)
+
+            # drop rows without year/values
+            g = g.dropna(subset=[year_col, value_col])
+
+            # group (in case multiple rows per year)
+            gg = (g.groupby([year_col, "Scenario_clean", detail_col], as_index=False)[value_col]
+                    .sum())
+
+            # plot: color by scenario, dash by detail vs summary
+            import plotly.express as px
+            fig_nat = px.line(
+                gg.sort_values([year_col, "Scenario_clean", detail_col]),
+                x=year_col, y=value_col,
+                color="Scenario_clean",
+                line_dash=detail_col,
+                title="National GHG Emissions — Detailed vs Scenario Summary"
+            )
+            fig_nat.update_layout(
+                xaxis_title="Year",
+                yaxis_title="Emissions (Mt CO₂e)",
+                legend_title_text="Scenario / Detail",
+                margin=dict(l=20, r=20, t=60, b=20)
+            )
+            st.plotly_chart(fig_nat, use_container_width=True)
+
+    except Exception as e:
+        st.error(f"Could not render the national trend from Tab3: {e}")
