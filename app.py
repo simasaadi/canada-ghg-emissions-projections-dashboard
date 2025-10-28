@@ -128,42 +128,46 @@ with tab1:
 
 
 # -------- Tab 2: Δ Heatmap (Additional Measures − Reference) --------
+# -------- Tab 2: Δ Heatmap (Additional Measures − Reference) --------
 with tab2:
     st.caption("Scenario Delta Heatmap — (Additional Measures − Reference) by Sector & Year")
 
-    dtmp = tidy_sectors(df)
-    wide_nat = dtmp.groupby(["Year","Economic Sector","Scenario"], as_index=False)["Emissions"].sum()
+    # Use a copy to avoid pandas warnings
+    dtmp = tidy_sectors(df.copy())
+
+    # Aggregate to national totals
+    wide_nat = dtmp.groupby(["Year", "Economic Sector", "Scenario"], as_index=False)["Emissions"].sum()
 
     wide_p = wide_nat.pivot_table(
-        index=["Year","Economic Sector"], columns="Scenario", values="Emissions"
+        index=["Year", "Economic Sector"], columns="Scenario", values="Emissions"
     ).reset_index()
 
-    # More robust selection of scenario columns:
+    # Robust column detection
     def pick(colset, must_have):
-        # return the longest matching column name containing all words in must_have
         cand = [c for c in colset if all(w.lower() in str(c).lower() for w in must_have)]
         return max(cand, key=lambda x: len(str(x))) if cand else None
 
-    ref_col = pick(wide_p.columns, ["reference"])         # e.g. "2024 Reference Case (Detailed)"
-    add_col = pick(wide_p.columns, ["additional"])        # e.g. "2024 Additional Measures Case (Detailed)"
+    ref_col = pick(wide_p.columns, ["reference"])
+    add_col = pick(wide_p.columns, ["additional"])
 
     if not ref_col or not add_col:
         st.warning("Could not find clearly labeled Reference / Additional scenario columns.")
     else:
         wide_p["Delta"] = wide_p[add_col] - wide_p[ref_col]
-        heat = wide_p.pivot(index="Economic Sector", columns="Year", values="Delta") \
-                     .reindex(SECTOR_ORDER)
+        heat = wide_p.pivot(index="Economic Sector", columns="Year", values="Delta").reindex(SECTOR_ORDER)
+
         import plotly.graph_objects as go
         z = heat.values
         x = heat.columns.astype(int).tolist()
         y = heat.index.tolist()
+
         fig_hm = go.Figure(data=go.Heatmap(
             z=z, x=x, y=y, colorscale="RdYlGn_r", colorbar=dict(title="Δ (Mt CO₂e)")
         ))
         fig_hm.update_layout(
             title="Scenario Delta Heatmap — Additional − Reference (National Totals)",
             xaxis_title="Year", yaxis_title="Economic Sector",
-            margin=dict(l=80,r=20,t=60,b=40)
+            margin=dict(l=80, r=20, t=60, b=40)
         )
         st.plotly_chart(fig_hm, use_container_width=True)
 
