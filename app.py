@@ -45,6 +45,17 @@ SECTOR_ORDER = [
     "Agriculture", "Buildings", "Electricity", "Heavy Industry",
     "Oil and Gas", "Transportation", "WCI Credits", "Waste and Others"
 ]
+SECTOR_COLORS = {
+    "Agriculture":        "#e6b800",   # yellow-gold
+    "Buildings":          "#76b7b2",   # teal
+    "Electricity":        "#1f77b4",   # blue
+    "Heavy Industry":     "#f2cf62",   # light gold
+    "Oil and Gas":        "#4e79a7",   # deeper blue (optional)
+    "Transportation":     "#d62728",   # red
+    "WCI Credits":        "#9467bd",   # purple
+    "Waste and Others":   "#2ca02c",   # green
+}
+
 
 def tidy_sectors(df_in):
     df2 = df_in.copy()
@@ -89,67 +100,64 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # -------- Tab 1: Stacked area like the PNG (Additional Measures) --------
 with tab1:
     st.caption("Sectoral Emissions — Additional Measures (mirrors the PNG style)")
-    df_add = df[df["Scenario"].str.contains("Additional", case=False, regex=True)].copy()
-    if prov != "All provinces":
-        df_add = df_add[df_add["Province"] == prov]
-    df_add = tidy_sectors(df_add)
-    # aggregate across provinces if "All provinces"
-    area = df_add.groupby(["Year","Economic Sector"], as_index=False)["Emissions"].sum()
+    # Always national totals, Additional Measures only
+    df_add = df[df["Scenario"].str.contains("Additional", case=False, regex=True)]
+    area = national_sum(df_add)  # << ignore province
     if area.empty:
         st.info("No data for this filter.")
     else:
-        # Use Plotly area with ordered stacking (closest visual to the PNG)
-        import plotly.express as px
-        fig2 = px.area(
-            area.sort_values(["Year","Economic Sector"]),
-            x="Year", y="Emissions", color="Economic Sector",
-            category_orders={"Economic Sector": SECTOR_ORDER},
-            title="Sectoral Emissions — Additional Measures"
-        )
+      fig2 = px.area(
+    area.sort_values(["Year","Economic Sector"]),
+    x="Year", y="Emissions", color="Economic Sector",
+    category_orders={"Economic Sector": SECTOR_ORDER},
+    color_discrete_map=SECTOR_COLORS,   # <-- this line
+    title="Sectoral Emissions — Additional Measures"
+)
+
         fig2.update_layout(legend_title_text="", margin=dict(l=20,r=20,t=60,b=20))
         st.plotly_chart(fig2, use_container_width=True)
+
 
 # -------- Tab 2: Δ Heatmap (Additional Measures − Reference) --------
 with tab2:
     st.caption("Scenario Delta Heatmap — (Additional Measures − Reference) by Sector & Year")
-    # Build wide tables per scenario
-    dtmp = tidy_sectors(df.copy())
-    wide = dtmp.pivot_table(
-        index=["Year","Economic Sector","Province","Scenario"],
-        values="Emissions",
-        aggfunc="sum"
-    ).reset_index()
 
-    # sum over provinces -> national level to match PNG
-    wide_nat = wide.groupby(["Year","Economic Sector","Scenario"], as_index=False)["Emissions"].sum()
+    dtmp = tidy_sectors(df)
+    wide_nat = dtmp.groupby(["Year","Economic Sector","Scenario"], as_index=False)["Emissions"].sum()
 
-    # pivot scenarios to columns
     wide_p = wide_nat.pivot_table(
         index=["Year","Economic Sector"], columns="Scenario", values="Emissions"
     ).reset_index()
 
-    # find columns for ref/add (best effort on names)
-    ref_col = [c for c in wide_p.columns if "Reference" in str(c)][0]
-    add_col = [c for c in wide_p.columns if "Additional" in str(c)][0]
+    # More robust selection of scenario columns:
+    def pick(colset, must_have):
+        # return the longest matching column name containing all words in must_have
+        cand = [c for c in colset if all(w.lower() in str(c).lower() for w in must_have)]
+        return max(cand, key=lambda x: len(str(x))) if cand else None
 
-    wide_p["Delta"] = wide_p[add_col] - wide_p[ref_col]
-    # pivot for heatmap layout: rows=sector, cols=year, values=delta
-    heat = wide_p.pivot(index="Economic Sector", columns="Year", values="Delta").reindex(SECTOR_ORDER)
+    ref_col = pick(wide_p.columns, ["reference"])         # e.g. "2024 Reference Case (Detailed)"
+    add_col = pick(wide_p.columns, ["additional"])        # e.g. "2024 Additional Measures Case (Detailed)"
 
-    import plotly.graph_objects as go
-    z = heat.values
-    x = heat.columns.astype(int).tolist()
-    y = heat.index.tolist()
+    if not ref_col or not add_col:
+        st.warning("Could not find clearly labeled Reference / Additional scenario columns.")
+    else:
+        wide_p["Delta"] = wide_p[add_col] - wide_p[ref_col]
+        heat = wide_p.pivot(index="Economic Sector", columns="Year", values="Delta") \
+                     .reindex(SECTOR_ORDER)
+        import plotly.graph_objects as go
+        z = heat.values
+        x = heat.columns.astype(int).tolist()
+        y = heat.index.tolist()
+        fig_hm = go.Figure(data=go.Heatmap(
+            z=z, x=x, y=y, colorscale="RdYlGn_r", colorbar=dict(title="Δ (Mt CO₂e)")
+        ))
+        fig_hm.update_layout(
+            title="Scenario Delta Heatmap — Additional − Reference (National Totals)",
+            xaxis_title="Year", yaxis_title="Economic Sector",
+            margin=dict(l=80,r=20,t=60,b=40)
+        )
+        st.plotly_chart(fig_hm, use_container_width=True)
 
-    fig_hm = go.Figure(data=go.Heatmap(
-        z=z, x=x, y=y, colorscale="RdYlGn_r", colorbar=dict(title="Δ (Mt CO₂e)")
-    ))
-    fig_hm.update_layout(
-        title="Scenario Delta Heatmap — Additional − Reference",
-        xaxis_title="Year", yaxis_title="Economic Sector",
-        margin=dict(l=80,r=20,t=60,b=40)
-    )
-    st.plotly_chart(fig_hm, use_container_width=True)
 
 # -------- Tab 3: Province bar (chosen year & scenario) --------
 with tab3:
