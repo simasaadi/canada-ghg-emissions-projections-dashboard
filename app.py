@@ -132,29 +132,46 @@ with tab1:
 with tab2:
     st.caption("Scenario Delta Heatmap — (Additional Measures − Reference) by Sector & Year")
 
-    # Use a copy to avoid pandas warnings
+    # DEBUG: show scenarios we have (remove after you confirm)
+    st.write("Scenarios found:", sorted(df["Scenario"].unique()))
+
     dtmp = tidy_sectors(df.copy())
 
-    # Aggregate to national totals
+    # National totals to mirror the PNG
     wide_nat = dtmp.groupby(["Year", "Economic Sector", "Scenario"], as_index=False)["Emissions"].sum()
-
     wide_p = wide_nat.pivot_table(
         index=["Year", "Economic Sector"], columns="Scenario", values="Emissions"
     ).reset_index()
 
-    # Robust column detection
-    def pick(colset, must_have):
-        cand = [c for c in colset if all(w.lower() in str(c).lower() for w in must_have)]
-        return max(cand, key=lambda x: len(str(x))) if cand else None
+    # Robust scenario pickers
+    def pick_col(cols, patterns):
+        # choose the longest column name that matches ALL patterns
+        cands = []
+        for c in cols:
+            name = str(c).lower()
+            if all(p.lower() in name for p in patterns):
+                cands.append(c)
+        if not cands:
+            return None
+        return max(cands, key=lambda x: len(str(x)))
 
-    ref_col = pick(wide_p.columns, ["reference"])
-    add_col = pick(wide_p.columns, ["additional"])
+    # try several patterns to be safe
+    ref_col = (pick_col(wide_p.columns, ["reference"]) or
+               pick_col(wide_p.columns, ["ref"]))  # fallback
+    add_col = (pick_col(wide_p.columns, ["additional"]) or
+               pick_col(wide_p.columns, ["add"]))  # fallback
 
     if not ref_col or not add_col:
-        st.warning("Could not find clearly labeled Reference / Additional scenario columns.")
+        st.error(
+            "Could not find the scenario columns for Reference / Additional Measures. "
+            "Make sure your scenario names include words like 'Reference' and 'Additional'."
+        )
+        st.write("Available columns:", list(wide_p.columns))
     else:
         wide_p["Delta"] = wide_p[add_col] - wide_p[ref_col]
-        heat = wide_p.pivot(index="Economic Sector", columns="Year", values="Delta").reindex(SECTOR_ORDER)
+        heat = (wide_p
+                .pivot(index="Economic Sector", columns="Year", values="Delta")
+                .reindex(SECTOR_ORDER))
 
         import plotly.graph_objects as go
         z = heat.values
@@ -170,6 +187,7 @@ with tab2:
             margin=dict(l=80, r=20, t=60, b=40)
         )
         st.plotly_chart(fig_hm, use_container_width=True)
+
 
 
 # -------- Tab 3: Province bar (chosen year & scenario) --------
