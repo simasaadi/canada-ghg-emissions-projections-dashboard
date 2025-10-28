@@ -3,3 +3,8 @@ pandas
 plotly
 openpyxl
 matplotlib
+streamlit
+pandas
+plotly
+openpyxl
+numpy
