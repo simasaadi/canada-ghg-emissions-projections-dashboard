@@ -89,119 +89,76 @@ df_base = tidy_sectors(df_base)
 
 st.markdown("### Canada GHG Emissions Dashboard")
 
-# ----------------- Tabs for the “pro” visuals -----------------
-tab1, tab2, tab3, tab4 = st.tabs([
-    "Stacked Area (Additional Measures)",
-    "Δ Heatmap (Add. − Ref.)",
-    "Provinces (Bar)",
-    "National Trend (Detailed vs Summary)*"
-])
+# --- Stacked Area (Additional Measures) ---
+st.markdown("### Sectoral Emissions — Additional Measures (mirrors the PNG style)")
 
-# -------- Tab 1: Stacked area like the PNG (Additional Measures) --------
-# -------- Tab 1: Stacked area like the PNG (Additional Measures) --------
-with tab1:
-    st.caption("Sectoral Emissions — Additional Measures (mirrors the PNG style)")
+df_add = df[df["Scenario"].str.contains("Additional", case=False, regex=True)].copy()
+if prov != "All provinces":
+    df_add = df_add[df_add["Province"] == prov]
+df_add = tidy_sectors(df_add)
+area = df_add.groupby(["Year","Economic Sector"], as_index=False)["Emissions"].sum()
 
-    df_add = df[df["Scenario"].str.contains("Additional", case=False, regex=True)].copy()
-    if prov != "All provinces":
-        df_add = df_add[df_add["Province"] == prov]
-    df_add = tidy_sectors(df_add)
-
-    # Aggregate across provinces (national total) for comparability with the PNG
-    area = df_add.groupby(["Year", "Economic Sector"], as_index=False)["Emissions"].sum()
-
-    if area.empty:
-        st.info("No data for this filter.")
-    else:
-        fig2 = px.area(
-            area.sort_values(["Year", "Economic Sector"]),
-            x="Year",
-            y="Emissions",
-            color="Economic Sector",
-            category_orders={"Economic Sector": SECTOR_ORDER},
-            # comment this line out if you didn't define SECTOR_COLORS
-            color_discrete_map=SECTOR_COLORS,
-            title="Sectoral Emissions — Additional Measures",
-        )
-        fig2.update_layout(legend_title_text="", margin=dict(l=20, r=20, t=60, b=20))
-        st.plotly_chart(fig2, use_container_width=True)
+if area.empty:
+    st.info("No data for this filter.")
+else:
+    fig2 = px.area(
+        area.sort_values(["Year","Economic Sector"]),
+        x="Year", y="Emissions", color="Economic Sector",
+        category_orders={"Economic Sector": SECTOR_ORDER},
+        color_discrete_map=SECTOR_COLORS,
+        title="Sectoral Emissions — Additional Measures",
+    )
+    fig2.update_layout(legend_title_text="", margin=dict(l=20, r=20, t=60, b=20))
+    st.plotly_chart(fig2, use_container_width=True)
 
 
-# -------- Tab 2: Δ Heatmap (Additional Measures − Reference) --------
-# -------- Tab 2: Δ Heatmap (Additional Measures − Reference) --------
-with tab2:
-    st.caption("Scenario Delta Heatmap — (Additional Measures − Reference) by Sector & Year")
+# --- Δ Heatmap (Additional Measures − Reference) ---
+st.markdown("### Scenario Delta Heatmap — (Additional Measures − Reference) by Sector & Year")
 
-    # DEBUG: show scenarios we have (remove after you confirm)
-    st.write("Scenarios found:", sorted(df["Scenario"].unique()))
+dtmp = tidy_sectors(df.copy())
+wide_nat = dtmp.groupby(["Year","Economic Sector","Scenario"], as_index=False)["Emissions"].sum()
+wide_p = wide_nat.pivot_table(index=["Year","Economic Sector"], columns="Scenario", values="Emissions").reset_index()
 
-    dtmp = tidy_sectors(df.copy())
+def pick(colset, must_have):
+    cand = [c for c in colset if all(w.lower() in str(c).lower() for w in must_have)]
+    return max(cand, key=lambda x: len(str(x))) if cand else None
 
-    # National totals to mirror the PNG
-    wide_nat = dtmp.groupby(["Year", "Economic Sector", "Scenario"], as_index=False)["Emissions"].sum()
-    wide_p = wide_nat.pivot_table(
-        index=["Year", "Economic Sector"], columns="Scenario", values="Emissions"
-    ).reset_index()
+ref_col = pick(wide_p.columns, ["reference"])
+add_col = pick(wide_p.columns, ["additional"])
 
-    # Robust scenario pickers
-    def pick_col(cols, patterns):
-        # choose the longest column name that matches ALL patterns
-        cands = []
-        for c in cols:
-            name = str(c).lower()
-            if all(p.lower() in name for p in patterns):
-                cands.append(c)
-        if not cands:
-            return None
-        return max(cands, key=lambda x: len(str(x)))
-
-    # try several patterns to be safe
-    ref_col = (pick_col(wide_p.columns, ["reference"]) or
-               pick_col(wide_p.columns, ["ref"]))  # fallback
-    add_col = (pick_col(wide_p.columns, ["additional"]) or
-               pick_col(wide_p.columns, ["add"]))  # fallback
-
-    if not ref_col or not add_col:
-        st.error(
-            "Could not find the scenario columns for Reference / Additional Measures. "
-            "Make sure your scenario names include words like 'Reference' and 'Additional'."
-        )
-        st.write("Available columns:", list(wide_p.columns))
-    else:
-        wide_p["Delta"] = wide_p[add_col] - wide_p[ref_col]
-        heat = (wide_p
-                .pivot(index="Economic Sector", columns="Year", values="Delta")
-                .reindex(SECTOR_ORDER))
-
-        import plotly.graph_objects as go
-        z = heat.values
-        x = heat.columns.astype(int).tolist()
-        y = heat.index.tolist()
-
-        fig_hm = go.Figure(data=go.Heatmap(
-            z=z, x=x, y=y, colorscale="RdYlGn_r", colorbar=dict(title="Δ (Mt CO₂e)")
-        ))
-        fig_hm.update_layout(
-            title="Scenario Delta Heatmap — Additional − Reference (National Totals)",
-            xaxis_title="Year", yaxis_title="Economic Sector",
-            margin=dict(l=80, r=20, t=60, b=40)
-        )
-        st.plotly_chart(fig_hm, use_container_width=True)
+if not ref_col or not add_col:
+    st.warning("Could not find clearly labeled Reference / Additional scenario columns.")
+else:
+    wide_p["Delta"] = wide_p[add_col] - wide_p[ref_col]
+    heat = wide_p.pivot(index="Economic Sector", columns="Year", values="Delta").reindex(SECTOR_ORDER)
+    import plotly.graph_objects as go
+    fig_hm = go.Figure(data=go.Heatmap(
+        z=heat.values,
+        x=heat.columns.astype(int).tolist(),
+        y=heat.index.tolist(),
+        colorscale="RdYlGn_r",
+        colorbar=dict(title="Δ (Mt CO₂e)")
+    ))
+    fig_hm.update_layout(
+        title="Scenario Delta Heatmap — Additional − Reference (National Totals)",
+        xaxis_title="Year", yaxis_title="Economic Sector",
+        margin=dict(l=80, r=20, t=60, b=40)
+    )
+    st.plotly_chart(fig_hm, use_container_width=True)
 
 
+# --- Provincial Bar Chart ---
+st.markdown(f"### Emissions by Province — {scn} — {yr}")
 
-# -------- Tab 3: Province bar (chosen year & scenario) --------
-with tab3:
-    st.caption(f"Emissions by Province — {scn} — {yr}")
-    prov_bar = df[(df["Scenario"] == scn) & (df["Year"] == yr)].groupby("Province", as_index=False)["Emissions"].sum()
-    prov_bar = prov_bar.sort_values("Emissions", ascending=False)
-    fig4 = px.bar(prov_bar, x="Province", y="Emissions", title=f"Emissions by Province — {scn} — {yr}")
-    fig4.update_layout(xaxis_tickangle=-35, margin=dict(l=20,r=20,t=60,b=80))
-    st.plotly_chart(fig4, use_container_width=True)
+prov_bar = df[(df["Scenario"] == scn) & (df["Year"] == yr)].groupby("Province", as_index=False)["Emissions"].sum()
+prov_bar = prov_bar.sort_values("Emissions", ascending=False)
+fig4 = px.bar(prov_bar, x="Province", y="Emissions", title=f"Emissions by Province — {scn} — {yr}")
+fig4.update_layout(xaxis_tickangle=-35, margin=dict(l=20,r=20,t=60,b=80))
+st.plotly_chart(fig4, use_container_width=True)
 
-# -------- Tab 4: National trend (Detailed vs Scenario Summary) --------
-with tab4:
-    st.caption("(*Requires the Tab3 national summary file to compare Detailed vs Scenario Summary*)")
-    st.write("This chart matches the multi-line figure in the PNGs. To enable it, make sure the file **data/Tab3_a1_megatonnes_ref_GHG_Scenarios_GES_EN.xlsx** is present and contains fields for Year, Sector/Total, Scenario, and a marker of ‘Detailed’ vs ‘Scenario summary’. Then plot both on one figure. If your column names differ, tweak the code accordingly.")
-    st.info("You already uploaded the Tab3 file — if you want, I can generate this plot too. For now the three visuals above mirror the PNGs.")
+
+# --- National Trend Placeholder ---
+st.markdown("### National Trend (Detailed vs Scenario Summary)*")
+st.caption("(*Requires the Tab3 national summary file to compare Detailed vs Scenario Summary*)")
+st.info("You already uploaded the Tab3 file — I can wire this plot next. For now the three visuals above mirror the PNGs.")
 
