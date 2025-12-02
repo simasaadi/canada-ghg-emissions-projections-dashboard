@@ -31,7 +31,12 @@ streamlit run app.py
 - Detailed projections by sector & province: `Tab2_detailed_GHG_emissions_GES_detaillees_EN.xlsx`
 - National scenario summary: `Tab3_a1_megatonnes_ref_GHG_Scenarios_GES_EN.xlsx`
 ### 🚀 Live Streamlit App
-[Open the interactive dashboard](https://canada-ghg-emissions-projections-dashboard-dhbdrslzfjzb8dnusog.streamlit.app)
+## 🚀 Live Streamlit App
+
+[![Streamlit App](https://img.shields.io/badge/Streamlit-Live%20App-red?logo=streamlit)](https://canada-ghg-emissions-projections-dashboard-dhbdrslzfjzb8dnusog.streamlit.app)
+
+Click the button above to open the fully interactive emissions dashboard.
+
 
 ### 🌐 GitHub Pages (HTML preview)
 [View the static HTML dashboard](https://simasaadi.github.io/canada-ghg-emissions-projections-dashboard/advanced_ghg_dashboard.html)
