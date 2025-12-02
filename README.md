@@ -1,7 +1,7 @@
 Canada GHG Emissions Projections — Policy Scenarios, Sectors & Provinces (ECCC)
 
-Interactive dashboard analyzing Canada’s greenhouse-gas emissions using open datasets from Environment and Climate Change Canada (ECCC).
-Built with Python, Plotly, and Streamlit, this tool lets users explore national, sectoral, and provincial emissions trajectories under multiple policy scenarios.
+Interactive dashboard analyzing Canada's greenhouse-gas emissions using open datasets from Environment and Climate Change Canada (ECCC).
+Built with Python, Plotly, and Streamlit.
 
 Key Questions This Dashboard Answers
 
@@ -15,8 +15,6 @@ Which provinces are projected to be the highest emitters in 2030 under the Refer
 
 Live Interactive App
 
-Open the app to explore scenarios, sectors, provinces, and year-by-year projections.
-
 Static HTML Version
 
 A single-file export of the full dashboard:
@@ -27,26 +25,25 @@ pip install -r requirements.txt
 streamlit run app.py
 
 Repository Structure
-
-app.py — main Streamlit application with filters and interactive charts
-
-advanced_ghg_dashboard.html — standalone HTML version of the dashboard
-
-requirements.txt — Python dependencies
-
-images/ — optional static figures (not required for running the app)
-
-data/ — ECCC Excel files (add locally; not stored in the repo)
+📁 canada-ghg-emissions-projections-dashboard
+│
+├── app.py                    # Main Streamlit application
+├── advanced_ghg_dashboard.html   # Standalone HTML dashboard
+├── requirements.txt          # Python dependencies
+│
+├── images/                   # Optional static figures
+│
+└── data/                     # ECCC Excel files (added locally)
 
 Data Sources
 
-Sectoral and provincial projections (detailed):
+Sectoral and provincial projections (detailed)
 Tab2_detailed_GHG_emissions_GES_detaillees_EN.xlsx
 
-National scenario summaries:
+National scenario summaries
 Tab3_a1_megatonnes_ref_GHG_Scenarios_GES_EN.xlsx
 
-These datasets come from the Government of Canada’s official emissions modelling suite.
+These datasets originate from the Government of Canada’s emissions modelling program.
 
 Created and maintained by Sima Saadi
 LinkedIn
