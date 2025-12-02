@@ -1,45 +1,52 @@
-# Canada GHG Emissions Projections — Policy Scenarios, Sectors & Provinces (ECCC)
+Canada GHG Emissions Projections — Policy Scenarios, Sectors & Provinces (ECCC)
 
-Interactive dashboard built with **Python, Plotly, and Streamlit** using open datasets from **Environment and Climate Change Canada (ECCC)**.
+Interactive dashboard analyzing Canada’s greenhouse-gas emissions using open datasets from Environment and Climate Change Canada (ECCC).
+Built with Python, Plotly, and Streamlit, this tool lets users explore national, sectoral, and provincial emissions trajectories under multiple policy scenarios.
 
-## 🔎 Key Questions Answered
-- How do national emissions evolve under the Reference vs Additional Measures scenarios?
-- Which sectors contribute most to future emissions, and how does this change over time?
-- What is the expected emissions difference (Additional Measures − Reference) by sector across years?
-- Which provinces are projected to emit the most in 2030 under the Reference scenario?
+Key Questions This Dashboard Answers
 
-## 🖼️ Visual Previews
-![National Trend](images/01_national_trend_detailed_vs_summary.png)
-![Sectoral Stacked Area — Additional Measures](images/02_sectoral_stacked_area.png)
-![Scenario Delta Heatmap](images/03_heatmap_delta.png)
-![Provincial Comparison](images/04_province_bar.png)
+How do national emissions change under Reference vs Additional Measures scenarios?
 
-## 🚀 Quick Start
-```bash
+Which sectors dominate future emissions, and how do their shares shift over time?
+
+What is the emissions gap between scenarios (Additional Measures − Reference)?
+
+Which provinces are projected to be the highest emitters in 2030 under the Reference scenario?
+
+Live Interactive App
+
+Open the app to explore scenarios, sectors, provinces, and year-by-year projections.
+
+Static HTML Version
+
+A single-file export of the full dashboard:
+https://simasaadi.github.io/canada-ghg-emissions-projections-dashboard/advanced_ghg_dashboard.html
+
+How to Run Locally
 pip install -r requirements.txt
 streamlit run app.py
-```
 
-## 📂 Repository Contents
-- `advanced_ghg_dashboard.html` — interactive single-file dashboard
-- `app.py` — Streamlit app with filters for scenario, sector, province, and year
-- `requirements.txt` — Python dependencies
-- `images/` — static PNGs of the main figures
-- `data/` — Excel files (ECCC projections) — add locally if needed
+Repository Structure
 
-## 📊 Data Sources
-- Detailed projections by sector & province: `Tab2_detailed_GHG_emissions_GES_detaillees_EN.xlsx`
-- National scenario summary: `Tab3_a1_megatonnes_ref_GHG_Scenarios_GES_EN.xlsx`
+app.py — main Streamlit application with filters and interactive charts
 
-## 🚀 Live Streamlit App
+advanced_ghg_dashboard.html — standalone HTML version of the dashboard
 
-[![Streamlit App](https://img.shields.io/badge/Streamlit-Live%20App-red?logo=streamlit)](https://canada-ghg-emissions-projections-dashboard-dhbdrslzfjzb8dnusog.streamlit.app)
+requirements.txt — Python dependencies
 
-Click the button above to open the fully interactive emissions dashboard.
+images/ — optional static figures (not required for running the app)
 
+data/ — ECCC Excel files (add locally; not stored in the repo)
 
-### 🌐 GitHub Pages (HTML preview)
-[View the static HTML dashboard](https://simasaadi.github.io/canada-ghg-emissions-projections-dashboard/advanced_ghg_dashboard.html)
+Data Sources
 
-Created and maintained by [Sima Saadi](https://www.linkedin.com/in/sima-saadi/) 
+Sectoral and provincial projections (detailed):
+Tab2_detailed_GHG_emissions_GES_detaillees_EN.xlsx
 
+National scenario summaries:
+Tab3_a1_megatonnes_ref_GHG_Scenarios_GES_EN.xlsx
+
+These datasets come from the Government of Canada’s official emissions modelling suite.
+
+Created and maintained by Sima Saadi
+LinkedIn
