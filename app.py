@@ -6,6 +6,9 @@ from pathlib import Path
 
 st.set_page_config(page_title="GHG Emissions Dashboard", layout="wide")
 st.title("Canada GHG Emissions Dashboard")
+st.markdown("""
+This interactive dashboard explores Canada’s greenhouse-gas emissions under different policy scenarios, with filters for province, sector, and year. Use the sidebar to shift between Additional Measures and Reference cases and to examine how emissions change across regions and economic sectors.
+""")
 
 # --- Load and combine sheets from Tab2 (detailed by province & sector) ---
 path = Path("data/Tab2_detailed_GHG_emissions_GES_detaillees_EN.xlsx")
