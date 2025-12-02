@@ -83,8 +83,6 @@ if sect != "All sectors":
     df_base = df_base[df_base["Economic Sector"] == sect]
 df_base = tidy_sectors(df_base)
 
-st.markdown("### Canada GHG Emissions Dashboard")
-
 # --- Stacked area (Additional Measures) ---
 st.markdown("### Sectoral Emissions - Additional Measures (mirrors the PNG style)")
 df_add = df[df["Scenario"].str.contains("Additional", case=False, regex=True)].copy()
