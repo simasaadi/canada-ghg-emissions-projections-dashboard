@@ -36,11 +36,11 @@ National scenario summary: Tab3_a1_megatonnes_ref_GHG_Scenarios_GES_EN.xlsx
 
 🚀 Live Streamlit App
 
-Click the button above to open the fully interactive emissions dashboard.
-
-🌐 GitHub Pages (HTML Preview)
-
-View the static HTML dashboard
+<p align="left">
+  <a href="https://canada-ghg-emissions-projections-dashboard-dhbdrslzfjzb8dnusog.streamlit.app/" target="_blank">
+    <img src="https://img.shields.io/badge/Open_Streamlit_Dashboard-4CAF50?style=for-the-badge&logo=streamlit&logoColor=white" alt="Streamlit Dashboard">
+  </a>
+</p>
 
 Created and maintained by Sima Saadi
 LinkedIn
